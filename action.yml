@@ -1,4 +1,4 @@
-name: "Setup Environment"
+name: "Setup Android Emulator Environment"
 description: "Sets up the environment for Android and Appium tests"
 inputs:
   api-level:
