@@ -1,0 +1,123 @@
+name: "Setup Environment"
+description: "Sets up the environment for Android and Appium tests"
+inputs:
+  api-level:
+    description: "API level for the Android emulator"
+    required: true
+  emu-tag:
+    description: "Emulator tag"
+    required: true
+  arch:
+    description: "Emulator architecture"
+    required: true
+outputs:
+  apk-path:
+    description: "Path to the APK"
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-node@v3
+      with:
+        node-version: lts/*
+        check-latest: true
+    - name: Install Dependencies
+      run: |
+        find . -regex '.*requirements.txt$'
+        pip3 install -r requirements.txt
+      shell: bash
+    - name: Get APK Path
+      run: echo "##[set-output name=APK_PATH;]$(pwd)"
+      id: get_apk_path
+      shell: bash
+
+    - name: Download The Latest APK
+      run: |
+        echo ${{ steps.get_apk_path.outputs.APK_PATH }} 
+        python3 HonestApp/resources/libs/apk_firebase.py ${{ steps.get_apk_path.outputs.APK_PATH }}
+      shell: bash
+    - name: Find app-qa
+      run: |
+        find . -regex '.*app-qa.apk$'
+      shell: bash
+    - run: curl -sSL https://bit.ly/install-xq | sudo bash
+      shell: bash
+
+    - uses: actions/setup-java@v3
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+
+    - name: Enable KVM
+      run: |
+        echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+        sudo udevadm control --reload-rules
+        sudo udevadm trigger --name-match=kvm
+      shell: bash
+
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+
+    - name: AVD cache
+      uses: actions/cache@v3
+      id: avd-cache
+      with:
+        path: |
+          ~/.android/*
+          $ANDROID_HOME/*
+        key: avd-${{ inputs.api-level }}-pixel6a-snapshot
+
+    - name: create AVD and generate snapshot for caching
+      if: steps.avd-cache.outputs.cache-hit != 'true'
+      uses: reactivecircus/android-emulator-runner@v2
+      with:
+        api-level: ${{ inputs.api-level }}
+        disable-spellchecker: true
+        disable-animations: true
+        profile: 28
+        ram-size: 10000M
+        cores: 2
+        emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back virtualscene
+        target: ${{ inputs.emu-tag }}
+        arch: ${{ inputs.arch }}
+        script: echo "Generated AVD snapshot for caching."
+        
+    - run: |
+        cwd=$(pwd)
+        pushd "$cwd"
+        cd ~
+        npm install -g appium
+        appium driver install uiautomator2
+        nohup appium server \
+          --port=4567 \
+          --address=127.0.0.1 \
+          --relaxed-security \
+          --log-no-colors \
+          --log-timestamp \
+          2>&1 > "$cwd/appium.log" &
+        popd
+      name: Start Appium server
+      shell: bash
+
+    - run: nohup adb logcat > logcat.log &
+      name: Capture logcat
+      shell: bash
+
+    - name: Move Virtual Scene Resource Files To Emulator
+      run: |
+        SOURCE_DIR="virtual-scene/"
+        DEST_DIR="$ANDROID_HOME/emulator/resources/"
+        for file in "$SOURCE_DIR"/*; do
+            filename=$(basename "$file")
+            mv "$file" "$DEST_DIR$filename"
+        done
+      shell: bash
+
+    - run: |
+        echo "APK Path: ${{ steps.get_apk_path.outputs.APK_PATH }}"
+      id: apk_output
+      name: Output APK Path
+      shell: bash
+
+    - run: echo "::set-output name=apk-path::${{ steps.apk_output.outputs.APK_PATH }}"
+      shell: bash
