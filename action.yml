@@ -121,3 +121,7 @@ runs:
 
     - run: echo "::set-output name=apk-path::${{ steps.apk_output.outputs.APK_PATH }}"
       shell: bash
+
+branding:
+  icon: sunrise
+  color: green
