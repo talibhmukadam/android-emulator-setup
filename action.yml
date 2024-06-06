@@ -10,6 +10,15 @@ inputs:
   arch:
     description: "Emulator architecture"
     required: true
+  branch_name:
+    description: "Name of the remote branch"
+    required: true
+  repo:
+    description: "Name of the remote repo"
+    required: true
+  token:
+    description: "Access token for the repo"
+    required: true
 outputs:
   apk-path:
     description: "Path to the APK"
@@ -17,6 +26,10 @@ runs:
   using: "composite"
   steps:
     - uses: actions/checkout@v3
+      with:
+        ref: ${{ inputs.branch_name }}
+        repository: ${{ inputs.repo }}
+        token: ${{ inputs.token }}
     - uses: actions/setup-node@v3
       with:
         node-version: lts/*
