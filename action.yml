@@ -47,7 +47,7 @@ runs:
     - name: Download The Latest APK
       run: |
         echo ${{ steps.get_apk_path.outputs.APK_PATH }} 
-        python3 HonestApp/resources/libs/apk_firebase.py ${{ steps.get_apk_path.outputs.APK_PATH }}
+        python3 HonestApp/resources/libs/apk_firebase.py /home
       shell: bash
     - name: Find app-qa
       run: |
